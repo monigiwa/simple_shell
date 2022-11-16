@@ -1,1 +1,1 @@
-Creating simple shell in c
+creating readme for simple shell in c
