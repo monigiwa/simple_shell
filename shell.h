@@ -1,79 +1,57 @@
 #ifndef SHELL_H
 #define SHELL_H
-#define bool int
-#define true 1
-#define false 0
-#define NPTRS(n) (n * sizeof(void *))
-#define NCHARS(n) (n * sizeof(char))
 
-#include "headers/include.h"
-#include "headers/list.h"
-#include "headers/string.h"
-#include "headers/builtin.h"
-#include "headers/path.h"
+#include <unistd.h>
+#include <stdlib.h>
+#include <stdio.h>
+#include <string.h>
+#include <sys/types.h>
+#include <sys/wait.h>
+#include <signal.h>
 
-extern char **environ;
+extern int exitcode;
+extern int errorcount;
 
-/* io */
-void printerr(const char *message);
-void printout(const char *message);
-void fprinterr(char *message);
-void fprintout(char *message);
-void prompt(state *self);
+/* check_helpers */
+int exit_check(char *user_input, char *NAME);
+int blank_check(char *user_input);
+int path_check(char *command);
+int env_check(char *user_input);
 
+/* error_helpers */
+void command_error(char *NAME, char *command);
+void exec_error(char *NAME, char *command);
+void access_error(char *NAME, char *command);
+void exit_error(char *NAME, char *user_input);
 
-/* quote */
-int findquote(char *str, char quote);
-void comment(char *string);
-bool should_quote(const char *string);
-char *remove_quotes(char *string);
+/* fork_wait_exec */
+void fork_wait_exec(char **commands, char **path_array,
+		    char **env, char *NAME, char *user_input);
 
-/* line */
-char *getlines(int fd);
-char **split(char *string, char *delimiter, unsigned int max, bool group_quote);
+/* memory_helpers */
+void free_array(char **array);
 
-/* find */
-char *findcmd(const char *command, const char *PATH);
-struct dirent *findfile(DIR *dir, const char *filename);
-char *joinpath(const char *base, const char *child);
-
-/* run */
-int interactive(state *self);
-int non_interactive(state *self, int fd);
-int execute(const char *program, char **args, char **env);
-int runline(state *self, char *line);
-bool runbuiltin(state *self, char **arguments);
-bool runprogram(state *self, char **arguments);
-bool runalias(state *self, char **command);
-
-/*tokenizefile*/
-char ***tokenizefiles(char *line);
-char **tokenizefile(char *line);
-void replaceline(char *av[]);
-
-/* append */
-bool appendStr(char ***arr, size_t *size, char *str, int index);
-bool appendChar(char **string, size_t *size, char chr, int index);
-bool appendInt(char **string, size_t *size, int num, int index);
-
-/*atoi*/
-int checkatoi(char *s);
+/* number_helpers */
 int _atoi(char *s);
+void print_number(int n);
 
+/* parse_input */
+int arg_counter(char *user_input);
+char **parse_input(char *user_input, char **path_array, char *NAME);
 
-/* format */
-char *format(const char *fmt, ...);
+/* string_helpers */
+int _strlen(char *str);
+int _strcmp(char *s1, char *s2);
+char *_strdup(char *str);
+int _putchar(char c);
 
+/* env_helpers */
+int get_path_count(char *path);
+char **get_path_array(char **env);
+char *find_path(char **path_array, char *token);
+void print_env(char **env);
 
-/* main */
-state *init(char *prog, char **env);
-void deinit(state *self);
-void cleanup(state *self);
-
-/* replacement */
-char *replace(state *self, char *var);
-
-/* realloc */
-void *_realloc(void *ptr, unsigned int osize, unsigned int nsize);
+/* splash screen */
+void display_splash_screen(FILE *file_ptr);
 
 #endif
