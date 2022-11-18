@@ -1,68 +1,139 @@
 #include "shell.h"
-
-int exitcode = 0;
-int errorcount = 0;
+#include <limits.h>
 
 /**
- * main - a simple shell program written in C
- * @argc: number of arguments
- * @argv: array of arguments
+ * init - initialize the shell's state
+ *
+ * @prog: the program name
+ * @env: the process' environment variables
+ *
+ * Return: the shell's state
+ */
+state *init(char *prog, char **env)
+{
+	state *self = malloc(sizeof(state));
+
+	self->lineno = 1;
+	self->aliases = NULL;
+	self->env = from_strarr(env);
+	self->prog = prog;
+	self->_errno = 0;
+	self->content = NULL;
+	self->lines = NULL;
+	self->tokens = NULL;
+	self->errno_buf = malloc(NCHARS(12));
+	self->pid_buf = format("%d", getpid());
+	self->parts = NULL;
+	self->command = NULL;
+	self->fd = 0;
+	self->buf = NULL;
+
+	return (self);
+}
+
+/**
+ * deinit - destroy the shell's state
+ *
+ * @self: the shell's state
+ *
+ * Return: nothing
+ */
+void deinit(state *self)
+{
+	if (!self)
+		return;
+
+	free_list(self->aliases);
+	free_list(self->env);
+	free(self->content);
+	free(self->lines);
+	free(self->tokens);
+	free(self->parts);
+	if (self->fd)
+		close(self->fd);
+	free(self->pid_buf);
+	free(self->errno_buf);
+	free(self->command);
+	free(self->buf);
+	free(self);
+}
+
+/**
+ * cleanup - routine clean up that frees up memory in the state
+ * @self: the shell's state
+ * Return: nothing
+ */
+void cleanup(state *self)
+{
+
+	if (!self)
+		return;
+
+	free(self->content);
+	self->content = NULL;
+	free(self->lines);
+	self->lines = NULL;
+	free(self->parts);
+	self->parts = NULL;
+	free(self->tokens);
+	self->tokens = NULL;
+	free(self->command);
+	self->command = NULL;
+}
+
+/**
+ * open_file - used by the main function to open a file
+ *
+ * @self: the shell's state
+ * @path: the path of the file
+ *
+ * Return: the open file descriptor
+ */
+int open_file(state *self, char *path)
+{
+	int fd;
+
+	fd = open(path, O_RDONLY);
+
+	if (fd == -1)
+	{
+		fprinterr(format("%s: 0: Can't open %s\n",
+			self->prog, path));
+		deinit(self);
+		exit(127);
+	}
+	self->fd = fd;
+	return (fd);
+}
+
+
+/**
+ * main - entry point
+ *
+ * @ac: number of argument variables
+ * @av: array of argument variables
  * @env: array of environment variables
  *
- * Return: 0 always (but program may exit early)
+ * Return: alway (0)
  */
-
-int main(__attribute__((unused)) int argc, char **argv, char **env)
+int main(int ac, char **av, char **env)
 {
-	char *user_input = NULL;
-	char **commands = NULL;
-	char **path_array = NULL;
-	size_t nbytes = 0;
-	ssize_t bytes_read = 0;
-	char *NAME = argv[0];
-	int atty_is = isatty(0);
-	char *filename = "splash_screen.txt";
-	FILE *fptr = NULL;
+	int status;
+	state *self;
+	int fd;
 
+	(void)ac;
+	fd = STDIN_FILENO;
 	signal(SIGINT, SIG_IGN);
+	self = init(av[0], env);
 
-	// display splash screen
-	if((fptr = fopen(filename,"r")) == NULL)
-	{
-		fprintf(stderr,"error opening %s\n",filename);
-		return 1;
-	}
-	display_splash_screen(fptr);
-	fclose(fptr);
-
-	while (1)
-	{
-		errorcount++;
-		if (atty_is)
-			write(STDOUT_FILENO, "hella_shell$ ", 13);
-		bytes_read = getline(&user_input, &nbytes, stdin);
-		if (bytes_read == -1)
-		{
-			free(user_input);
-			exit(exitcode);
-		}
-		if (exit_check(user_input, NAME) == -1)
-			continue;
-		if (blank_check(user_input) == 1)
-			continue;
-		if (env_check(user_input) == 1)
-		{
-			print_env(env);
-			continue;
-		}
-		path_array = get_path_array(env);
-		commands = parse_input(user_input, path_array, NAME);
-		if (commands != NULL)
-		{
-			fork_wait_exec(commands, path_array, env, NAME, user_input);
-			free_array(commands);
-			free_array(path_array);
-		}
-	}
-	return (0);
+	if (av[1])
+		fd = open_file(self, av[1]);
+	if (isatty(fd))
+		interactive(self);
+	else
+		non_interactive(self, fd);
+	status = self->_errno;
+	deinit(self);
+	return (status);
 }
